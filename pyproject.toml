@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "playlist-downloader"
+version = "0.1.0"
+description = "Download YouTube playlists — numbered, subtitled, in parallel. Offline desktop app for macOS and Windows."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "pywebview>=6.2",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "websockets>=13",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.21", "certifi"]
+dev = ["pytest>=8", "httpx>=0.27", "certifi"]
+
+[project.scripts]
+playlist-downloader = "playlist_downloader.cli:main"
+pldl = "playlist_downloader.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+playlist_downloader = ["web/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

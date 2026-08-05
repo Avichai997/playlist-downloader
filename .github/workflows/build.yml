@@ -1,0 +1,106 @@
+name: build
+
+# Build the portable macOS .app and Windows .exe.
+# - push a tag  v*   -> builds both AND publishes a GitHub Release with the artifacts
+# - manual run (workflow_dispatch) or push to main -> builds both, uploads as artifacts
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install app + build deps
+        run: pip install -e ".[build]"
+      - name: Bundle engines
+        run: python fetch_binaries.py
+      - name: Build .app
+        run: pyinstaller --clean --noconfirm playlist-downloader.spec
+      - name: Smoke test (app bundle exists)
+        run: test -d dist/PlaylistDownloader.app
+      - name: Package .dmg (drag-to-Applications)
+        run: |
+          set -e
+          staging="$(mktemp -d)"
+          cp -R dist/PlaylistDownloader.app "$staging/"
+          ln -s /Applications "$staging/Applications"
+          hdiutil create -volname "Playlist Downloader" -srcfolder "$staging" \
+            -ov -format UDZO "dist/PlaylistDownloader-macOS-arm64.dmg"
+          hdiutil verify "dist/PlaylistDownloader-macOS-arm64.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlaylistDownloader-macOS-arm64
+          path: dist/PlaylistDownloader-macOS-arm64.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install app + build deps
+        run: pip install -e ".[build]"
+      - name: Bundle engines
+        run: python fetch_binaries.py
+      - name: Build .exe
+        run: pyinstaller --clean --noconfirm playlist-downloader.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlaylistDownloader-Windows
+          path: dist/PlaylistDownloader.exe
+
+  release:
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/PlaylistDownloader-macOS-arm64/PlaylistDownloader-macOS-arm64.dmg
+            artifacts/PlaylistDownloader-Windows/PlaylistDownloader.exe
+          body: |
+            Portable YouTube playlist downloader for macOS and Windows.
+
+            - **macOS (Apple Silicon):** open the .dmg, drag the app to Applications, then right-click → Open (first launch only).
+            - **Windows:** run the .exe, SmartScreen → More info → Run anyway (first launch only).
+
+            Personal archival tool — respect YouTube's terms and content licensing.
