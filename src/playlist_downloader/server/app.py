@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from .. import APP_NAME, __version__
 from ..core import db as db_module
-from ..core import ytdlp
+from ..core import native, ytdlp
 from ..core.errors import PlaylistDownloaderError
 from ..core.service import Service
 
@@ -31,13 +31,29 @@ service = Service()
 class AnalyzeRequest(BaseModel):
     url: str
     sampleSize: int | None = None
+    container: str | None = None
+    outputDir: str | None = None
 
 
 class StartRequest(BaseModel):
     height: int | None = None
+    container: str | None = None
+    outputDir: str | None = None
     startFrom: int | None = None
     endAt: int | None = None
     redownload: bool = False
+
+
+class OutputRequest(BaseModel):
+    outputDir: str
+
+
+class ContainerRequest(BaseModel):
+    container: str
+
+
+class PickFolderRequest(BaseModel):
+    initial: str = ""
 
 
 class RevealRequest(BaseModel):
@@ -82,7 +98,38 @@ def analyze(request: AnalyzeRequest) -> dict:
     url = request.url.strip()
     if not url:
         raise HTTPException(400, "Paste a playlist or video link first.")
-    return service.analyze(url, sample_size=request.sampleSize or 12)
+    return service.analyze(
+        url,
+        sample_size=request.sampleSize or 12,
+        container=request.container,
+        output_dir=request.outputDir,
+    )
+
+
+@app.post("/api/pick-folder")
+def pick_folder(request: PickFolderRequest) -> dict:
+    chosen = native.pick_folder(request.initial or None)
+    return {"path": chosen}
+
+
+@app.put("/api/playlists/{playlist_id}/output")
+def set_playlist_output(playlist_id: str, request: OutputRequest) -> dict:
+    if not request.outputDir.strip():
+        raise HTTPException(400, "Choose a folder first.")
+    try:
+        return service.set_playlist_output(playlist_id, request.outputDir.strip())
+    except KeyError as exc:
+        raise HTTPException(404, "That playlist is not in the library.") from exc
+
+
+@app.post("/api/playlists/{playlist_id}/qualities")
+def refresh_qualities(playlist_id: str, request: ContainerRequest) -> dict:
+    if request.container not in ("mkv", "mp4", "webm"):
+        raise HTTPException(400, "Format must be mkv, mp4, or webm.")
+    try:
+        return service.refresh_qualities(playlist_id, container=request.container)
+    except KeyError as exc:
+        raise HTTPException(404, "That playlist is not in the library.") from exc
 
 
 @app.get("/api/playlists")
@@ -96,6 +143,8 @@ def start_playlist(playlist_id: str, request: StartRequest) -> dict:
         return service.enqueue_range(
             playlist_id,
             height=request.height,
+            container=request.container,
+            output_dir=request.outputDir,
             start_from=request.startFrom,
             end_at=request.endAt,
             redownload=request.redownload,

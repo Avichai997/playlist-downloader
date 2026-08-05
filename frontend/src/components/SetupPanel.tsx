@@ -1,6 +1,7 @@
-import { DownloadIcon, FolderIcon, HardDriveIcon, RefreshCwIcon } from "lucide-react";
+import { DownloadIcon, FolderOpenIcon, HardDriveIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { FormatPicker } from "@/components/FormatPicker";
 import { QualityPicker } from "@/components/QualityPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,8 @@ export function SetupPanel() {
   const busy = useStore((state) => state.busy);
   const start = useStore((state) => state.start);
   const sync = useStore((state) => state.sync);
+  const setOutputDir = useStore((state) => state.setOutputDir);
+  const pickOutputFolder = useStore((state) => state.pickOutputFolder);
 
   const [startFrom, setStartFrom] = useState("");
   const [endAt, setEndAt] = useState("");
@@ -62,6 +65,28 @@ export function SetupPanel() {
     }
   };
 
+  const onBrowse = async () => {
+    try {
+      await pickOutputFolder();
+    } catch (error) {
+      toast.error("Could not open folder picker", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const onOutputBlur = async () => {
+    const trimmed = playlist.outputDir.trim();
+    if (!trimmed) return;
+    try {
+      await setOutputDir(trimmed);
+    } catch (error) {
+      toast.error("Invalid folder", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-5">
@@ -80,20 +105,39 @@ export function SetupPanel() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <FolderIcon className="size-3.5" />
-            {playlist.outputDir}
-          </span>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">Save to folder</Label>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={playlist.outputDir}
+              onChange={(event) =>
+                useStore.setState({
+                  playlist: { ...playlist, outputDir: event.target.value },
+                })
+              }
+              onBlur={onOutputBlur}
+              spellCheck={false}
+              className="min-w-0 flex-1 font-mono text-xs"
+            />
+            <Button variant="outline" size="sm" onClick={onBrowse} disabled={busy}>
+              <FolderOpenIcon />
+              Browse…
+            </Button>
+          </div>
           {disk && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <HardDriveIcon className="size-3.5" />
-              {bytes(disk.free)} free
+              {bytes(disk.free)} free on this drive
             </span>
           )}
         </div>
 
-        <QualityPicker />
+        <FormatPicker />
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Video quality</span>
+          <QualityPicker />
+        </div>
 
         <div className="flex flex-wrap items-end gap-4 border-t border-border pt-4">
           <div className="flex flex-col gap-1.5">

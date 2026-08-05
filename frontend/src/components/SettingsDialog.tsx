@@ -103,8 +103,9 @@ export function SettingsDialog() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mkv">MKV</SelectItem>
-                  <SelectItem value="mp4">MP4</SelectItem>
+                  <SelectItem value="mp4">MP4 — plays everywhere</SelectItem>
+                  <SelectItem value="mkv">MKV — best for subtitles</SelectItem>
+                  <SelectItem value="webm">WebM — smaller VP9 files</SelectItem>
                 </SelectContent>
               </Select>
             </Row>

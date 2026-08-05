@@ -20,6 +20,15 @@ from .. import APP_NAME, __version__
 STARTUP_TIMEOUT = 30.0
 
 
+class DesktopApi:
+    """Exposed to the UI via pywebview's js_api (window.pywebview.api)."""
+
+    def pick_folder(self, initial: str = "") -> str | None:
+        from ..core import native
+
+        return native.pick_folder(initial or None)
+
+
 def _free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -70,6 +79,7 @@ def main() -> int:
         width=1200,
         height=840,
         min_size=(960, 640),
+        js_api=DesktopApi(),
     )
     webview.start()
     server.stop()

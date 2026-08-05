@@ -192,6 +192,11 @@ def format_selector(*, max_height: int, container: str, audio_only: bool) -> str
             f"bv*[height<={max_height}][vcodec^=avc1]+ba[acodec^=mp4a]/"
             f"bv*[height<={max_height}]+ba/b[height<={max_height}]/b"
         )
+    if container == "webm":
+        return (
+            f"bv*[height<={max_height}][vcodec^=vp9]+ba[acodec^=opus]/"
+            f"bv*[height<={max_height}]+ba/b[height<={max_height}]/bv*+ba/b"
+        )
     return f"bv*[height<={max_height}]+ba/b[height<={max_height}]/bv*+ba/b"
 
 

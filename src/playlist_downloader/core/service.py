@@ -50,13 +50,28 @@ class Service:
 
     # ---------- playlists ----------
 
-    def analyze(self, url: str, *, sample_size: int = formats.DEFAULT_SAMPLE_SIZE) -> dict:
+    def analyze(
+        self,
+        url: str,
+        *,
+        sample_size: int = formats.DEFAULT_SAMPLE_SIZE,
+        container: str | None = None,
+        output_dir: str | None = None,
+    ) -> dict:
         self.events.publish("analyze_stage", stage="reading playlist")
         snapshot = playlist_module.fetch(url)
 
-        output_dir = Path(self.settings.output_root) / naming.sanitize(snapshot.title)
+        active_container = container or self.settings.container
+        if container and container != self.settings.container:
+            self.update_settings({"container": container})
+
+        if output_dir:
+            target = Path(output_dir)
+        else:
+            target = Path(self.settings.output_root) / naming.sanitize(snapshot.title)
+
         self.db.upsert_playlist(
-            snapshot, output_dir=str(output_dir), max_height=self.settings.max_height
+            snapshot, output_dir=str(target), max_height=self.settings.max_height
         )
         fresh = self.db.sync_videos(snapshot.playlist_id, snapshot.entries)
 
@@ -67,7 +82,7 @@ class Service:
 
         qualities = formats.analyze(
             snapshot.entries,
-            container=self.settings.container,
+            container=active_container,
             sample_size=sample_size,
             on_progress=report,
         )
@@ -81,14 +96,45 @@ class Service:
                 "count": len(snapshot.entries),
                 "newCount": len(fresh),
                 "totalDuration": snapshot.total_duration,
-                "outputDir": str(output_dir),
+                "outputDir": str(target),
             },
             "qualities": [quality.to_dict() for quality in qualities],
-            "disk": self.disk_report(output_dir),
+            "container": active_container,
+            "disk": self.disk_report(target),
             "stats": self.db.stats(snapshot.playlist_id),
         }
         self.events.publish("analyze_done", **result)
         return result
+
+    def set_playlist_output(self, playlist_id: str, output_dir: str) -> dict:
+        record = self.db.get_playlist(playlist_id)
+        if record is None:
+            raise KeyError(playlist_id)
+        path = Path(output_dir).expanduser()
+        if not path.is_absolute():
+            path = path.resolve()
+        self.db.update_playlist(playlist_id, output_dir=str(path))
+        return {"outputDir": str(path), "disk": self.disk_report(path)}
+
+    def refresh_qualities(self, playlist_id: str, *, container: str | None = None) -> dict:
+        record = self.db.get_playlist(playlist_id)
+        if record is None:
+            raise KeyError(playlist_id)
+        active = container or self.settings.container
+        if container and container != self.settings.container:
+            self.update_settings({"container": container})
+
+        snapshot = playlist_module.fetch(record["url"])
+        qualities = formats.analyze(
+            snapshot.entries,
+            container=active,
+            sample_size=formats.DEFAULT_SAMPLE_SIZE,
+        )
+        return {
+            "qualities": [quality.to_dict() for quality in qualities],
+            "container": active,
+            "disk": self.disk_report(record["output_dir"]),
+        }
 
     def sync(self, playlist_id: str) -> dict:
         record = self.db.get_playlist(playlist_id)
@@ -110,6 +156,8 @@ class Service:
         playlist_id: str,
         *,
         height: int | None = None,
+        container: str | None = None,
+        output_dir: str | None = None,
         start_from: int | None = None,
         end_at: int | None = None,
         redownload: bool = False,
@@ -118,6 +166,10 @@ class Service:
         if record is None:
             raise KeyError(playlist_id)
 
+        if container and container != self.settings.container:
+            self.update_settings({"container": container})
+        if output_dir:
+            self.set_playlist_output(playlist_id, output_dir)
         if height:
             self.db.update_playlist(playlist_id, max_height=height)
 

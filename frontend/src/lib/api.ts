@@ -94,6 +94,8 @@ export interface Settings {
 
 export interface StartOptions {
   height?: number;
+  container?: string;
+  outputDir?: string;
   startFrom?: number | null;
   endAt?: number | null;
   redownload?: boolean;
@@ -170,6 +172,29 @@ export const api = {
     request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(changes) }),
 
   reveal: (path: string) => post<{ ok: boolean }>("/api/reveal", { path }),
+
+  pickFolder: async (initial?: string): Promise<string | null> => {
+    if (window.pywebview?.api?.pick_folder) {
+      const chosen = window.pywebview.api.pick_folder(initial ?? "");
+      return chosen || null;
+    }
+    const result = await post<{ path: string | null }>("/api/pick-folder", {
+      initial: initial ?? "",
+    });
+    return result.path;
+  },
+
+  setPlaylistOutput: (playlistId: string, outputDir: string) =>
+    request<{ outputDir: string; disk: Disk }>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/output`,
+      { method: "PUT", body: JSON.stringify({ outputDir }) },
+    ),
+
+  refreshQualities: (playlistId: string, container: string) =>
+    post<{ qualities: Quality[]; container: string; disk: Disk }>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/qualities`,
+      { container },
+    ),
 };
 
 export type ServerEvent =

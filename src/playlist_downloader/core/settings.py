@@ -15,6 +15,9 @@ def _default_output_root() -> str:
     return str(downloads if downloads.is_dir() else Path.home())
 
 
+ALLOWED_CONTAINERS = ("mkv", "mp4", "webm")
+
+
 @dataclass
 class Settings:
     output_root: str = field(default_factory=_default_output_root)
@@ -52,6 +55,8 @@ class Settings:
         self.parallel_videos = max(1, min(MAX_PARALLEL_VIDEOS, self.parallel_videos))
         self.fragments_per_video = max(1, min(64, self.fragments_per_video))
         self.max_height = max(144, min(4320, self.max_height))
+        if self.container not in ALLOWED_CONTAINERS:
+            self.container = "mkv"
         return self
 
     def to_dict(self) -> dict:

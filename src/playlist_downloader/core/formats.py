@@ -70,6 +70,9 @@ def _best_audio(formats: Sequence[dict], container: str) -> dict | None:
     if container == "mp4":
         preferred = [f for f in candidates if str(f.get("acodec", "")).startswith("mp4a")]
         candidates = preferred or candidates
+    if container == "webm":
+        preferred = [f for f in candidates if str(f.get("acodec", "")).startswith("opus")]
+        candidates = preferred or candidates
     return max(candidates, key=lambda f: f.get("abr") or f.get("tbr") or 0)
 
 
@@ -83,6 +86,9 @@ def _best_video_per_height(formats: Sequence[dict], container: str) -> dict[int,
     for height, candidates in by_height.items():
         if container == "mp4":
             preferred = [f for f in candidates if str(f.get("vcodec", "")).startswith("avc1")]
+            candidates = preferred or candidates
+        if container == "webm":
+            preferred = [f for f in candidates if str(f.get("vcodec", "")).startswith("vp9")]
             candidates = preferred or candidates
         chosen[height] = max(candidates, key=lambda f: f.get("tbr") or 0)
     return chosen

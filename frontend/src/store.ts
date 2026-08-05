@@ -11,6 +11,7 @@ import {
   type Settings,
   type Stats,
 } from "@/lib/api";
+import type { VideoContainer } from "@/lib/containers";
 
 export interface LiveProgress {
   percent: number | null;
@@ -36,6 +37,7 @@ interface AppState {
   qualities: Quality[];
   disk: Disk | null;
   selectedHeight: number | null;
+  selectedContainer: VideoContainer;
 
   jobs: Job[];
   progress: Record<number, LiveProgress>;
@@ -58,6 +60,9 @@ interface AppState {
   bootstrap: () => Promise<void>;
   analyze: (url: string) => Promise<void>;
   selectHeight: (height: number) => void;
+  setContainer: (container: VideoContainer) => Promise<void>;
+  setOutputDir: (path: string) => Promise<void>;
+  pickOutputFolder: () => Promise<void>;
   start: (options: { startFrom: number | null; endAt: number | null; redownload: boolean }) => Promise<number>;
   sync: () => Promise<{ found: number; queued: number }>;
   refreshJobs: () => Promise<void>;
@@ -76,6 +81,7 @@ export const useStore = create<AppState>((set, get) => ({
   qualities: [],
   disk: null,
   selectedHeight: null,
+  selectedContainer: "mkv",
 
   jobs: [],
   progress: {},
@@ -97,7 +103,12 @@ export const useStore = create<AppState>((set, get) => ({
 
   async bootstrap() {
     const [settings, engine] = await Promise.all([api.getSettings(), api.engine()]);
-    set({ settings, engineVersion: engine.ytdlp, selectedHeight: settings.max_height });
+    set({
+      settings,
+      engineVersion: engine.ytdlp,
+      selectedHeight: settings.max_height,
+      selectedContainer: (settings.container as VideoContainer) || "mkv",
+    });
   },
 
   async analyze(url) {
@@ -115,6 +126,7 @@ export const useStore = create<AppState>((set, get) => ({
         disk: analysis.disk,
         stats: analysis.stats,
         selectedHeight: best?.height ?? null,
+        selectedContainer: (get().settings?.container as VideoContainer) || "mkv",
       });
       await get().refreshJobs();
     } finally {
@@ -126,13 +138,54 @@ export const useStore = create<AppState>((set, get) => ({
     set({ selectedHeight: height });
   },
 
+  async setContainer(container) {
+    const { playlist, busy } = get();
+    if (busy) return;
+    set({ busy: true, selectedContainer: container });
+    try {
+      if (playlist) {
+        const result = await api.refreshQualities(playlist.id, container);
+        set({
+          qualities: result.qualities,
+          disk: result.disk,
+          playlist: { ...playlist, outputDir: playlist.outputDir },
+          settings: { ...(get().settings as Settings), container },
+        });
+      } else {
+        const settings = await api.putSettings({ container });
+        set({ settings });
+      }
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  async setOutputDir(path) {
+    const { playlist } = get();
+    if (!playlist) return;
+    const result = await api.setPlaylistOutput(playlist.id, path);
+    set({
+      playlist: { ...playlist, outputDir: result.outputDir },
+      disk: result.disk,
+    });
+  },
+
+  async pickOutputFolder() {
+    const { playlist } = get();
+    if (!playlist) return;
+    const chosen = await api.pickFolder(playlist.outputDir);
+    if (chosen) await get().setOutputDir(chosen);
+  },
+
   async start({ startFrom, endAt, redownload }) {
-    const { playlist, selectedHeight } = get();
+    const { playlist, selectedHeight, selectedContainer } = get();
     if (!playlist) return 0;
     set({ busy: true });
     try {
       const result = await api.start(playlist.id, {
         height: selectedHeight ?? undefined,
+        container: selectedContainer,
+        outputDir: playlist.outputDir,
         startFrom,
         endAt,
         redownload,
@@ -215,6 +268,7 @@ export const useStore = create<AppState>((set, get) => ({
       stats: EMPTY_STATS,
       filter: "all",
       search: "",
+      selectedContainer: (get().settings?.container as VideoContainer) || "mkv",
     });
   },
 
