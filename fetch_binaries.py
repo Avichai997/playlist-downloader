@@ -17,6 +17,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import os
 import platform
 import shutil
 import ssl
@@ -61,8 +62,17 @@ def _ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 
+def _request_headers() -> dict[str, str]:
+    headers = {"User-Agent": "playlist-downloader-build"}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        headers["Accept"] = "application/vnd.github+json"
+    return headers
+
+
 def _get(url: str, *, timeout: int = 300) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "playlist-downloader-build"})
+    request = urllib.request.Request(url, headers=_request_headers())
     with urllib.request.urlopen(  # noqa: S310
         request, timeout=timeout, context=_ssl_context()
     ) as response:

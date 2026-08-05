@@ -36,6 +36,8 @@ jobs:
         run: pip install -e ".[build]"
       - name: Bundle engines
         run: python fetch_binaries.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build .app
         run: pyinstaller --clean --noconfirm playlist-downloader.spec
       - name: Smoke test (app bundle exists)
@@ -76,6 +78,8 @@ jobs:
         run: pip install -e ".[build]"
       - name: Bundle engines
         run: python fetch_binaries.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build .exe
         run: pyinstaller --clean --noconfirm playlist-downloader.spec
       - uses: actions/upload-artifact@v4
