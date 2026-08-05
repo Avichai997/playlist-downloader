@@ -65,6 +65,11 @@ export interface Analysis {
   stats: Stats;
 }
 
+export interface AppUpdateInfo {
+  version: string;
+  url: string;
+}
+
 export interface Settings {
   output_root: string;
   container: string;
@@ -128,6 +133,8 @@ const post = <T>(path: string, body?: unknown) =>
 export const api = {
   health: () => request<{ ok: boolean; version: string }>("/api/health"),
   engine: () => request<{ ytdlp: string; error?: string }>("/api/engine"),
+  checkUpdate: () =>
+    request<{ available: boolean; version?: string; url?: string }>("/api/update"),
 
   analyze: (url: string) => post<Analysis>("/api/analyze", { url }),
 
@@ -172,6 +179,7 @@ export const api = {
     request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(changes) }),
 
   reveal: (path: string) => post<{ ok: boolean }>("/api/reveal", { path }),
+  openUrl: (url: string) => post<{ ok: boolean }>("/api/open-url", { url }),
 
   pickFolder: async (initial?: string): Promise<string | null> => {
     if (window.pywebview?.api?.pick_folder) {
@@ -221,6 +229,7 @@ export type ServerEvent =
   | { type: "synced"; playlistId: string; found: number; queued: number }
   | { type: "settings"; settings: Settings }
   | { type: "ytdlp_update"; ok: boolean; message: string; version?: string }
+  | { type: "app_update"; version: string; url: string }
   | { type: "watch_error"; playlistId: string; message: string };
 
 /** Keeps a WebSocket to the local server open, reconnecting if it drops. */

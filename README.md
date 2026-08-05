@@ -90,6 +90,10 @@ both platforms and publish a Release with:
 Download links in this README point at `/releases/latest/download/…` and update
 automatically on each new release.
 
+The desktop app checks GitHub on launch and shows a **Download update** banner when
+a newer tagged release is available (notify only — you install the `.dmg` or `.exe`
+yourself, same as [dwfx2pdf](https://github.com/Avichai997/dwfx2pdf)).
+
 ## Bundled components
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — Unlicense

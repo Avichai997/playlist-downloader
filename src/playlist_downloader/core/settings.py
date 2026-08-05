@@ -51,12 +51,23 @@ class Settings:
     update_ytdlp_on_launch: bool = True
     watch_interval_hours: int = 0
 
+    audio_enhance: bool = False
+    audio_preset: str = "off"
+    audio_denoise: bool = True
+    audio_normalize: bool = True
+    audio_highpass_hz: int = 80
+    audio_lowpass_hz: int = 16000
+
     def clamped(self) -> Settings:
         self.parallel_videos = max(1, min(MAX_PARALLEL_VIDEOS, self.parallel_videos))
         self.fragments_per_video = max(1, min(64, self.fragments_per_video))
         self.max_height = max(144, min(4320, self.max_height))
         if self.container not in ALLOWED_CONTAINERS:
             self.container = "mkv"
+        if self.audio_preset not in ("off", "studio", "podcast", "music", "voice", "custom"):
+            self.audio_preset = "off"
+        self.audio_highpass_hz = max(0, min(500, self.audio_highpass_hz))
+        self.audio_lowpass_hz = max(0, min(24000, self.audio_lowpass_hz))
         return self
 
     def to_dict(self) -> dict:

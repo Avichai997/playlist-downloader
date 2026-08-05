@@ -197,7 +197,10 @@ def format_selector(*, max_height: int, container: str, audio_only: bool) -> str
             f"bv*[height<={max_height}][vcodec^=vp9]+ba[acodec^=opus]/"
             f"bv*[height<={max_height}]+ba/b[height<={max_height}]/bv*+ba/b"
         )
-    return f"bv*[height<={max_height}]+ba/b[height<={max_height}]/bv*+ba/b"
+    return (
+        f"bv*[height<={max_height}]+ba[abr>=128]/"
+        f"bv*[height<={max_height}]+ba/b[height<={max_height}]/bv*+ba/b"
+    )
 
 
 def build_download_argv(

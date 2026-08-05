@@ -6,8 +6,10 @@ import {
   RotateCcwIcon,
   SkipForwardIcon,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ThumbnailPreviewDialog } from "@/components/ThumbnailPreviewDialog";
+import { VideoThumbnail } from "@/components/VideoThumbnail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -15,7 +17,7 @@ import { api, type Job, type JobState } from "@/lib/api";
 import { bytes, duration, padNumber, speed } from "@/lib/format";
 import { useStore } from "@/store";
 
-const ROW_HEIGHT = 52;
+const ROW_HEIGHT = 64;
 
 const STATE_LABEL: Record<JobState, string> = {
   queued: "Queued",
@@ -35,7 +37,13 @@ const STATE_VARIANT: Record<JobState, "default" | "running" | "done" | "failed" 
   skipped: "default",
 };
 
-function JobRow({ job }: { job: Job }) {
+function JobRow({
+  job,
+  onPreview,
+}: {
+  job: Job;
+  onPreview: (job: Job) => void;
+}) {
   const live = useStore((state) => state.progress[job.id]);
   const jobAction = useStore((state) => state.jobAction);
 
@@ -59,10 +67,19 @@ function JobRow({ job }: { job: Job }) {
   };
 
   return (
-    <div className="flex h-[52px] items-center gap-3 border-b border-border px-4 text-sm">
+    <div className="flex h-[64px] items-center gap-3 border-b border-border px-4 text-sm">
       <span className="tabular w-12 shrink-0 text-xs text-muted-foreground">
         {padNumber(job.number, job.total_count)}
       </span>
+
+      <button
+        type="button"
+        className="shrink-0 rounded-md ring-offset-background transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        onClick={() => onPreview(job)}
+        title={`Preview ${job.title}`}
+      >
+        <VideoThumbnail videoId={job.video_id} title={job.title} size="sm" />
+      </button>
 
       <div className="min-w-0 flex-1">
         <div className="truncate" title={job.title}>
@@ -141,6 +158,7 @@ function JobRow({ job }: { job: Job }) {
 export function JobTable() {
   const jobs = useStore((state) => state.jobs);
   const container = useRef<HTMLDivElement>(null);
+  const [previewJob, setPreviewJob] = useState<Job | null>(null);
 
   const virtualizer = useVirtualizer({
     count: jobs.length,
@@ -160,21 +178,34 @@ export function JobTable() {
   }
 
   return (
-    <div
-      ref={container}
-      className="flex-1 overflow-y-auto rounded-xl border border-border bg-card"
-    >
-      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((item) => (
-          <div
-            key={item.key}
-            className="absolute left-0 top-0 w-full"
-            style={{ transform: `translateY(${item.start}px)` }}
-          >
-            <JobRow job={jobs[item.index]} />
-          </div>
-        ))}
+    <>
+      <div
+        ref={container}
+        className="flex-1 overflow-y-auto rounded-xl border border-border bg-card"
+      >
+        <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((item) => (
+            <div
+              key={item.key}
+              className="absolute left-0 top-0 w-full"
+              style={{ transform: `translateY(${item.start}px)` }}
+            >
+              <JobRow job={jobs[item.index]} onPreview={setPreviewJob} />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {previewJob && (
+        <ThumbnailPreviewDialog
+          open={Boolean(previewJob)}
+          onOpenChange={(open) => {
+            if (!open) setPreviewJob(null);
+          }}
+          videoId={previewJob.video_id}
+          title={previewJob.title}
+        />
+      )}
+    </>
   );
 }

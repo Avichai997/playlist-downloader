@@ -60,6 +60,10 @@ class RevealRequest(BaseModel):
     path: str
 
 
+class OpenUrlRequest(BaseModel):
+    url: str
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     service.events.bind(asyncio.get_running_loop())
@@ -81,6 +85,14 @@ async def _domain_error(_, exc: PlaylistDownloaderError) -> JSONResponse:
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "version": __version__}
+
+
+@app.get("/api/update")
+def check_update() -> dict:
+    info = service.check_app_update()
+    if info is None:
+        return {"available": False}
+    return {"available": True, **info}
 
 
 @app.get("/api/settings")
@@ -243,6 +255,20 @@ def reveal(request: RevealRequest) -> dict:
     else:
         argv = ["xdg-open", str(target.parent)]
     subprocess.Popen(argv)
+    return {"ok": True}
+
+
+@app.post("/api/open-url")
+def open_url(request: OpenUrlRequest) -> dict:
+    url = request.url.strip()
+    if not url.startswith(("https://", "http://")):
+        raise HTTPException(400, "Only http(s) links are allowed.")
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", url])
+    elif sys.platform == "win32":
+        subprocess.Popen(["cmd", "/c", "start", "", url], shell=True)
+    else:
+        subprocess.Popen(["xdg-open", url])
     return {"ok": True}
 
 

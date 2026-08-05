@@ -5,6 +5,7 @@ import { JobTable } from "@/components/JobTable";
 import { QueueToolbar } from "@/components/QueueToolbar";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { SetupPanel } from "@/components/SetupPanel";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { UrlBar } from "@/components/UrlBar";
 import { Button } from "@/components/ui/button";
 import { connectEvents } from "@/lib/api";
@@ -69,6 +70,8 @@ export default function App() {
           <SettingsDialog />
         </div>
       </header>
+
+      <UpdateBanner />
 
       {playlist ? (
         <main className="flex min-h-0 flex-1 flex-col gap-4 p-6">

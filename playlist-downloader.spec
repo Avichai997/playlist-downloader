@@ -9,7 +9,7 @@ import platform
 import sys
 from pathlib import Path
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 
 def _tag():

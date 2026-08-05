@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   api,
   type Analysis,
+  type AppUpdateInfo,
   type Disk,
   type Job,
   type JobState,
@@ -47,6 +48,8 @@ interface AppState {
 
   settings: Settings | null;
   engineVersion: string;
+  appVersion: string;
+  appUpdate: AppUpdateInfo | null;
 
   analyzing: boolean;
   analyzeStage: string;
@@ -73,6 +76,7 @@ interface AppState {
   setFilter: (filter: JobState | "all") => void;
   setSearch: (search: string) => void;
   clearPlaylist: () => void;
+  dismissUpdate: () => void;
   handleEvent: (event: ServerEvent) => void;
 }
 
@@ -91,6 +95,8 @@ export const useStore = create<AppState>((set, get) => ({
 
   settings: null,
   engineVersion: "",
+  appVersion: "",
+  appUpdate: null,
 
   analyzing: false,
   analyzeStage: "",
@@ -102,10 +108,20 @@ export const useStore = create<AppState>((set, get) => ({
   search: "",
 
   async bootstrap() {
-    const [settings, engine] = await Promise.all([api.getSettings(), api.engine()]);
+    const [settings, engine, health, update] = await Promise.all([
+      api.getSettings(),
+      api.engine(),
+      api.health(),
+      api.checkUpdate(),
+    ]);
     set({
       settings,
       engineVersion: engine.ytdlp,
+      appVersion: health.version,
+      appUpdate:
+        update.available && update.version && update.url
+          ? { version: update.version, url: update.url }
+          : null,
       selectedHeight: settings.max_height,
       selectedContainer: (settings.container as VideoContainer) || "mkv",
     });
@@ -272,6 +288,10 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
+  dismissUpdate() {
+    set({ appUpdate: null });
+  },
+
   handleEvent(event) {
     switch (event.type) {
       case "stats":
@@ -342,6 +362,9 @@ export const useStore = create<AppState>((set, get) => ({
         break;
       case "ytdlp_update":
         if (event.version) set({ engineVersion: event.version });
+        break;
+      case "app_update":
+        set({ appUpdate: { version: event.version, url: event.url } });
         break;
       default:
         break;

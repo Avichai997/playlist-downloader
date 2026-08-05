@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import db as db_module
-from . import naming, verify, ytdlp
+from . import audio, naming, verify, ytdlp
 from .db import Database
 from .errors import VerificationFailed
 from .events import EventBus
@@ -311,6 +311,12 @@ class Scheduler:
             except VerificationFailed as exc:
                 path.unlink(missing_ok=True)
                 return str(exc)
+
+        if self._settings.audio_enhance and audio.build_audio_filter(self._settings):
+            try:
+                audio.enhance_in_place(path, self._settings)
+            except Exception as exc:  # noqa: BLE001
+                return f"Audio enhancement failed: {exc}"
 
         size = path.stat().st_size
         self._db.set_state(
