@@ -83,6 +83,7 @@ interface AppState {
   setSearch: (search: string) => void;
   clearPlaylist: () => void;
   dismissUpdate: () => void;
+  checkForUpdate: () => Promise<{ available: boolean; version?: string }>;
   handleEvent: (event: ServerEvent) => void;
 }
 
@@ -329,6 +330,16 @@ export const useStore = create<AppState>((set, get) => ({
 
   dismissUpdate() {
     set({ appUpdate: null });
+  },
+
+  async checkForUpdate() {
+    const update = await api.checkUpdate();
+    if (update.available && update.version && update.url) {
+      set({ appUpdate: { version: update.version, url: update.url } });
+      return { available: true, version: update.version };
+    }
+    set({ appUpdate: null });
+    return { available: false };
   },
 
   handleEvent(event) {

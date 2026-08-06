@@ -6,6 +6,7 @@ import { QueueToolbar } from "@/components/QueueToolbar";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { SetupPanel } from "@/components/SetupPanel";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { UpdateButton } from "@/components/UpdateButton";
 import { UrlBar } from "@/components/UrlBar";
 import { Button } from "@/components/ui/button";
 import { connectEvents } from "@/lib/api";
@@ -54,6 +55,7 @@ export default function App() {
           <span className="tabular text-xs text-muted-foreground">yt-dlp {engineVersion}</span>
         )}
         <div className="ml-auto flex items-center gap-1">
+          <UpdateButton />
           {playlist && (
             <Button
               variant="ghost"

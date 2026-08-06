@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { UpdateButton } from "@/components/UpdateButton";
 import type { Settings } from "@/lib/api";
 import { useStore } from "@/store";
 
@@ -48,6 +49,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 
 export function SettingsDialog() {
   const settings = useStore((state) => state.settings);
+  const appVersion = useStore((state) => state.appVersion);
   const saveSettings = useStore((state) => state.saveSettings);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Settings | null>(settings);
@@ -282,6 +284,13 @@ export function SettingsDialog() {
                 <span className="text-xs text-muted-foreground">hours</span>
               </div>
             </Row>
+          </Section>
+
+          <Section title="App">
+            <p className="text-xs text-muted-foreground">
+              Playlist Downloader <span className="tabular">v{appVersion || "…"}</span>
+            </p>
+            <UpdateButton />
           </Section>
         </div>
 
