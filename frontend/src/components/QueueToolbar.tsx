@@ -1,5 +1,6 @@
 import { PauseIcon, PlayIcon, RotateCcwIcon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
+import { QueueManageMenu } from "@/components/QueueManageMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { useStore } from "@/store";
 
 const FILTERS: { key: JobState | "all"; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "idle", label: "Not queued" },
   { key: "running", label: "Downloading" },
   { key: "queued", label: "Queued" },
   { key: "done", label: "Done" },
@@ -42,6 +44,7 @@ export function QueueToolbar() {
 
   const counts: Record<string, number> = {
     all: stats.total,
+    idle: stats.idle,
     running: stats.running,
     queued: stats.queued,
     done: stats.done,
@@ -98,6 +101,7 @@ export function QueueToolbar() {
             Retry {stats.failed} failed
           </Button>
         )}
+        <QueueManageMenu />
         <Button variant={paused ? "default" : "secondary"} size="sm" onClick={toggleQueue}>
           {paused ? <PlayIcon /> : <PauseIcon />}
           {paused ? "Resume all" : "Pause all"}

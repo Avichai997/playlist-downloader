@@ -270,6 +270,36 @@ class Service:
         result["stats"] = self.db.stats(playlist_id)
         return result
 
+    def verify_files(self, playlist_id: str) -> dict:
+        result = self.library.verify_missing_files(playlist_id)
+        result["stats"] = self.db.stats(playlist_id)
+        self.events.publish("stats", stats=result["stats"], paused=self.scheduler.paused)
+        return result
+
+    def reset_playlist(
+        self,
+        playlist_id: str,
+        *,
+        delete_files: bool = False,
+        refetch: bool = True,
+    ) -> dict:
+        record = self.db.get_playlist(playlist_id)
+        if record is None:
+            raise KeyError(playlist_id)
+        self.scheduler.pause_all()
+        result = self.library.reset_playlist(
+            playlist_id,
+            delete_files=delete_files,
+            refetch=refetch,
+        )
+        self.events.publish("stats", stats=result["stats"], paused=self.scheduler.paused)
+        return result
+
+    def list_jobs(self, playlist_id: str, **params) -> dict:
+        self.library.verify_missing_files(playlist_id)
+        jobs = self.db.list_jobs(playlist_id, **params)
+        return {"jobs": jobs, "stats": self.db.stats(playlist_id)}
+
     # ---------- audio ----------
 
     def audio_presets(self) -> list[dict]:

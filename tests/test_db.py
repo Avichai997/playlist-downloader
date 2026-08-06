@@ -34,6 +34,26 @@ def test_numbers_are_assigned_in_playlist_order(database):
     assert jobs == ["a", "b", "c"]
 
 
+def test_verify_missing_files_requeues_done_jobs_without_files(database, tmp_path):
+    _store(database, _snapshot("a", "b"))
+    database.enqueue("PL1", ["a", "b"])
+    missing = tmp_path / "gone.mkv"
+    present = tmp_path / "kept.mkv"
+    present.write_bytes(b"x" * 100)
+
+    jobs = {job["video_id"]: job for job in database.list_jobs("PL1") if job["id"]}
+    database.set_state(jobs["a"]["id"], db_module.DONE, filepath=str(missing), filesize=10)
+    database.set_state(jobs["b"]["id"], db_module.DONE, filepath=str(present), filesize=100)
+
+    from playlist_downloader.core.library import Library
+
+    result = Library(database).verify_missing_files("PL1")
+    assert result["requeued"] == 1
+    states = {row["video_id"]: row["state"] for row in database.list_jobs("PL1") if row["id"]}
+    assert states["a"] == db_module.QUEUED
+    assert states["b"] == db_module.DONE
+
+
 def test_resync_keeps_existing_numbers_and_appends_new_ones(database):
     _store(database, _snapshot("a", "b", "c"))
 

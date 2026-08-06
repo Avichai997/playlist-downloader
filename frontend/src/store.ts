@@ -24,6 +24,7 @@ export interface LiveProgress {
 }
 
 const EMPTY_STATS: Stats = {
+  idle: 0,
   queued: 0,
   running: 0,
   paused: 0,
@@ -71,6 +72,11 @@ interface AppState {
   refreshJobs: () => Promise<void>;
   toggleQueue: () => Promise<void>;
   retryFailed: () => Promise<number>;
+  verifyFiles: () => Promise<{ requeued: number }>;
+  resetPlaylist: (options: {
+    deleteFiles: boolean;
+    refetch: boolean;
+  }) => Promise<{ videoCount: number }>;
   jobAction: (jobId: number, action: "pause" | "resume" | "skip" | "retry") => Promise<void>;
   saveSettings: (changes: Partial<Settings>) => Promise<void>;
   setFilter: (filter: JobState | "all") => void;
@@ -233,6 +239,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { jobs, stats } = await api.listJobs(playlist.id, {
       state: filter === "all" ? undefined : filter,
       search: search || undefined,
+      limit: 5000,
     });
     set({ jobs, stats });
   },
@@ -250,6 +257,38 @@ export const useStore = create<AppState>((set, get) => ({
     const { requeued } = await api.retryFailed(playlist.id);
     await get().refreshJobs();
     return requeued;
+  },
+
+  async verifyFiles() {
+    const { playlist } = get();
+    if (!playlist) return { requeued: 0 };
+    const result = await api.verifyFiles(playlist.id);
+    await get().refreshJobs();
+    return result;
+  },
+
+  async resetPlaylist({ deleteFiles, refetch }) {
+    const { playlist } = get();
+    if (!playlist) return { videoCount: 0 };
+    set({ busy: true });
+    try {
+      const result = await api.resetPlaylist(playlist.id, { deleteFiles, refetch });
+      if (result.playlist) {
+        set({
+          playlist: result.playlist,
+          stats: result.stats,
+          jobs: [],
+          progress: {},
+        });
+        await get().refreshJobs();
+      } else {
+        set({ stats: result.stats });
+        await get().refreshJobs();
+      }
+      return { videoCount: result.videoCount };
+    } finally {
+      set({ busy: false });
+    }
   },
 
   async jobAction(jobId, action) {

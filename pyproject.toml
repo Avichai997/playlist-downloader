@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "playlist-downloader"
-version = "0.1.2"
+version = "0.1.4"
 description = "Download YouTube playlists — numbered, subtitled, in parallel. Offline desktop app for macOS and Windows."
 readme = "README.md"
 requires-python = ">=3.10"

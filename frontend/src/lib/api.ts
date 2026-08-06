@@ -1,7 +1,7 @@
-export type JobState = "queued" | "running" | "paused" | "done" | "failed" | "skipped";
+export type JobState = "idle" | "queued" | "running" | "paused" | "done" | "failed" | "skipped";
 
 export interface Job {
-  id: number;
+  id: number | null;
   playlist_id: string;
   video_id: string;
   state: JobState;
@@ -44,6 +44,7 @@ export interface PlaylistInfo {
 }
 
 export interface Stats {
+  idle: number;
   queued: number;
   running: number;
   paused: number;
@@ -140,10 +141,11 @@ export const api = {
 
   listPlaylists: () => request<Record<string, unknown>[]>("/api/playlists"),
 
-  listJobs: (playlistId: string, params: { state?: string; search?: string } = {}) => {
+  listJobs: (playlistId: string, params: { state?: string; search?: string; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.state) query.set("state", params.state);
     if (params.search) query.set("search", params.search);
+    if (params.limit) query.set("limit", String(params.limit));
     const suffix = query.toString() ? `?${query}` : "";
     return request<{ jobs: Job[]; stats: Stats }>(
       `/api/playlists/${encodeURIComponent(playlistId)}/jobs${suffix}`,
@@ -203,6 +205,26 @@ export const api = {
       `/api/playlists/${encodeURIComponent(playlistId)}/qualities`,
       { container },
     ),
+
+  verifyFiles: (playlistId: string) =>
+    post<{ requeued: number; stats: Stats }>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/verify-files`,
+    ),
+
+  resetPlaylist: (
+    playlistId: string,
+    options: { deleteFiles?: boolean; refetch?: boolean } = {},
+  ) =>
+    post<{
+      jobsCleared: number;
+      deletedFiles: number;
+      videoCount: number;
+      stats: Stats;
+      playlist?: PlaylistInfo;
+    }>(`/api/playlists/${encodeURIComponent(playlistId)}/reset`, {
+      deleteFiles: options.deleteFiles ?? false,
+      refetch: options.refetch ?? true,
+    }),
 };
 
 export type ServerEvent =

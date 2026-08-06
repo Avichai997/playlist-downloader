@@ -64,6 +64,11 @@ class OpenUrlRequest(BaseModel):
     url: str
 
 
+class ResetRequest(BaseModel):
+    deleteFiles: bool = False
+    refetch: bool = True
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     service.events.bind(asyncio.get_running_loop())
@@ -178,14 +183,33 @@ def list_jobs(
     playlist_id: str,
     state: str = "",
     search: str = "",
-    limit: int = 2000,
+    limit: int = 5000,
     offset: int = 0,
 ) -> dict:
     states = [part for part in state.split(",") if part] or None
-    jobs = service.db.list_jobs(
+    return service.list_jobs(
         playlist_id, states=states, search=search, limit=limit, offset=offset
     )
-    return {"jobs": jobs, "stats": service.db.stats(playlist_id)}
+
+
+@app.post("/api/playlists/{playlist_id}/verify-files")
+def verify_files(playlist_id: str) -> dict:
+    try:
+        return service.verify_files(playlist_id)
+    except KeyError as exc:
+        raise HTTPException(404, "That playlist is not in the library.") from exc
+
+
+@app.post("/api/playlists/{playlist_id}/reset")
+def reset_playlist(playlist_id: str, request: ResetRequest) -> dict:
+    try:
+        return service.reset_playlist(
+            playlist_id,
+            delete_files=request.deleteFiles,
+            refetch=request.refetch,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, "That playlist is not in the library.") from exc
 
 
 @app.get("/api/stats")

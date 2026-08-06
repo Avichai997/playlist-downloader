@@ -20,6 +20,7 @@ import { useStore } from "@/store";
 const ROW_HEIGHT = 64;
 
 const STATE_LABEL: Record<JobState, string> = {
+  idle: "Not queued",
   queued: "Queued",
   running: "Downloading",
   paused: "Paused",
@@ -29,6 +30,7 @@ const STATE_LABEL: Record<JobState, string> = {
 };
 
 const STATE_VARIANT: Record<JobState, "default" | "running" | "done" | "failed" | "paused"> = {
+  idle: "default",
   queued: "default",
   running: "running",
   paused: "paused",
@@ -44,10 +46,11 @@ function JobRow({
   job: Job;
   onPreview: (job: Job) => void;
 }) {
-  const live = useStore((state) => state.progress[job.id]);
+  const live = job.id ? useStore((state) => state.progress[job.id!]) : undefined;
   const jobAction = useStore((state) => state.jobAction);
 
   const act = async (action: "pause" | "resume" | "skip" | "retry") => {
+    if (!job.id) return;
     try {
       await jobAction(job.id, action);
     } catch (error) {
@@ -62,7 +65,10 @@ function JobRow({
     try {
       await api.reveal(job.filepath);
     } catch {
-      toast.error("That file is no longer there");
+      await useStore.getState().refreshJobs();
+      toast.error("That file is no longer there", {
+        description: "It was moved back to the queue for re-download.",
+      });
     }
   };
 
@@ -184,12 +190,12 @@ export function JobTable() {
         className="flex-1 overflow-y-auto rounded-xl border border-border bg-card"
       >
         <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualizer.getVirtualItems().map((item) => (
-            <div
-              key={item.key}
-              className="absolute left-0 top-0 w-full"
-              style={{ transform: `translateY(${item.start}px)` }}
-            >
+        {virtualizer.getVirtualItems().map((item) => (
+          <div
+            key={jobs[item.index].video_id}
+            className="absolute left-0 top-0 w-full"
+            style={{ transform: `translateY(${item.start}px)` }}
+          >
               <JobRow job={jobs[item.index]} onPreview={setPreviewJob} />
             </div>
           ))}

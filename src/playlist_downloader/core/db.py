@@ -85,8 +85,12 @@ CREATE INDEX IF NOT EXISTS attempts_by_job ON attempts (job_id);
 """
 
 _JOB_COLUMNS = """
-    j.id, j.playlist_id, j.video_id, j.state, j.priority, j.strategy,
-    j.attempts, j.filepath, j.filesize, j.verified, j.error,
+    j.id, j.playlist_id, v.video_id,
+    COALESCE(j.state, 'idle') AS state,
+    COALESCE(j.priority, 0) AS priority,
+    COALESCE(j.strategy, 0) AS strategy,
+    COALESCE(j.attempts, 0) AS attempts,
+    j.filepath, j.filesize, COALESCE(j.verified, 0) AS verified, j.error,
     j.started_at, j.finished_at,
     v.number, v.title, v.duration, v.position,
     p.output_dir, p.max_height, p.total_count
@@ -386,6 +390,19 @@ class Database:
             )
         return cursor.rowcount or 0
 
+    def delete_all_jobs(self, playlist_id: str) -> int:
+        with self._write_lock:
+            conn = self._connection()
+            conn.execute(
+                """
+                DELETE FROM attempts
+                 WHERE job_id IN (SELECT id FROM jobs WHERE playlist_id = ?)
+                """,
+                (playlist_id,),
+            )
+            cursor = conn.execute("DELETE FROM jobs WHERE playlist_id = ?", (playlist_id,))
+            return cursor.rowcount or 0
+
     def record_attempt(
         self, job_id: int, strategy: str, ok: bool, error: str = "", log: str = ""
     ) -> None:
@@ -410,16 +427,16 @@ class Database:
         *,
         states: Sequence[str] | None = None,
         search: str = "",
-        limit: int = 2000,
+        limit: int = 5000,
         offset: int = 0,
     ) -> list[dict]:
         clauses: list[str] = []
         params: list[Any] = []
         if playlist_id:
-            clauses.append("j.playlist_id = ?")
+            clauses.append("v.playlist_id = ?")
             params.append(playlist_id)
         if states:
-            clauses.append(f"j.state IN ({','.join('?' for _ in states)})")
+            clauses.append(f"COALESCE(j.state, 'idle') IN ({','.join('?' for _ in states)})")
             params.extend(states)
         if search:
             clauses.append("v.title LIKE ?")
@@ -429,9 +446,9 @@ class Database:
 
         rows = self._connection().execute(
             f"""
-            SELECT {_JOB_COLUMNS} FROM jobs j
-              JOIN videos v ON v.playlist_id = j.playlist_id AND v.video_id = j.video_id
-              JOIN playlists p ON p.id = j.playlist_id
+            SELECT {_JOB_COLUMNS} FROM videos v
+              JOIN playlists p ON p.id = v.playlist_id
+              LEFT JOIN jobs j ON j.playlist_id = v.playlist_id AND j.video_id = v.video_id
             {where}
              ORDER BY v.number ASC
              LIMIT ? OFFSET ?
@@ -441,15 +458,29 @@ class Database:
         return [dict(row) for row in rows]
 
     def stats(self, playlist_id: str | None = None) -> dict[str, int]:
-        clause = "WHERE playlist_id = ?" if playlist_id else ""
-        params = (playlist_id,) if playlist_id else ()
-        rows = self._connection().execute(
-            f"SELECT state, COUNT(*) AS n FROM jobs {clause} GROUP BY state", params
-        ).fetchall()
+        if playlist_id:
+            video_total = self._connection().execute(
+                "SELECT COUNT(*) AS n FROM videos WHERE playlist_id = ?",
+                (playlist_id,),
+            ).fetchone()["n"]
+            rows = self._connection().execute(
+                "SELECT state, COUNT(*) AS n FROM jobs WHERE playlist_id = ? GROUP BY state",
+                (playlist_id,),
+            ).fetchall()
+        else:
+            video_total = self._connection().execute(
+                "SELECT COUNT(*) AS n FROM videos"
+            ).fetchone()["n"]
+            rows = self._connection().execute(
+                "SELECT state, COUNT(*) AS n FROM jobs GROUP BY state"
+            ).fetchall()
+
         counts = {state: 0 for state in (QUEUED, RUNNING, PAUSED, DONE, FAILED, SKIPPED)}
         for row in rows:
             counts[row["state"]] = row["n"]
-        counts["total"] = sum(counts.values())
+        job_total = sum(counts.values())
+        counts["idle"] = max(0, int(video_total) - job_total)
+        counts["total"] = int(video_total)
         return counts
 
     def downloaded_bytes(self, playlist_id: str | None = None) -> int:
